@@ -106,40 +106,17 @@ def generate_random_pattern():
     return pattern
 
 def pattern_to_image(pattern):
-    scale = 80  # Slightly reduced from 100
+    scale = 40  # Reduced for serverless
     size = 7 * scale
     padding = scale
     total_size = size + (2 * padding)
     
-    # Create base image
     image = Image.new('RGB', (total_size, total_size), 'white')
     draw = ImageDraw.Draw(image)
     
-    # Add gradient background
-    for y in range(total_size):
-        for x in range(total_size):
-            color = int(255 * (1 - y/total_size * 0.1))
-            draw.point((x, y), fill=(color, color, color))
+    # Use default font only
+    font = ImageFont.load_default()
     
-    # Try multiple regular (non-bold) system fonts
-    font = None
-    possible_fonts = [
-        "C:\\Windows\\Fonts\\arial.ttf",  # Regular Arial
-        "C:\\Windows\\Fonts\\consola.ttf",  # Regular Consolas
-        "C:\\Windows\\Fonts\\segoeui.ttf"  # Regular Segoe UI
-    ]
-    
-    for font_path in possible_fonts:
-        try:
-            font = ImageFont.truetype(font_path, scale)
-            break
-        except OSError:
-            continue
-            
-    if font is None:
-        font = ImageFont.load_default()
-    
-    # Draw pattern (without shadow)
     lines = pattern.split('\n')
     for i, line in enumerate(lines):
         for j, char in enumerate(line):
@@ -148,30 +125,27 @@ def pattern_to_image(pattern):
                 y = padding + (i * scale)
                 draw.text((x, y), char, fill=(0, 0, 0), font=font)
     
-    # Convert to base64
     buffered = io.BytesIO()
     image.save(buffered, format="PNG")
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return img_str
 
-@app.route('/')
-def index():
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def catch_all(path):
     try:
-        pattern_type = random.choice(patterns_array)
+        pattern_type = path if path else random.choice(patterns_array)
+        if pattern_type.upper() not in [p.upper() for p in patterns_array]:
+            return jsonify({'error': 'Invalid pattern type'}), 400
+            
         pattern = generate_pattern(pattern_type)
         img_str = pattern_to_image(pattern)
-        return jsonify({'image': img_str})
+        return jsonify({
+            'status': 'success',
+            'image': f'data:image/png;base64,{img_str}'
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-@app.route('/<pattern_type>')
-def get_pattern(pattern_type):
-    try:
-        pattern = generate_pattern(pattern_type)
-        img_str = pattern_to_image(pattern)
-        return jsonify({'image': img_str})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
 
 if __name__ == '__main__':
     app.run(debug=True, port=3000)
