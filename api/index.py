@@ -7,6 +7,7 @@ import random
 import io
 from flask_cors import CORS
 import base64
+import sys
 
 app = Flask(__name__)
 CORS(app)
@@ -130,6 +131,10 @@ def pattern_to_image(pattern):
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return img_str
 
+@app.route('/healthcheck')
+def healthcheck():
+    return jsonify({'status': 'healthy'})
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def catch_all(path):
@@ -147,5 +152,7 @@ def catch_all(path):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Remove debug mode
 if __name__ == '__main__':
-    app.run(debug=True, port=3000)
+    app = app.wsgi_app
+    app.run(debug=False, port=3000)
