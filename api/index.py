@@ -6,6 +6,7 @@ import os
 import random
 import io
 from flask_cors import CORS
+import base64
 
 app = Flask(__name__)
 CORS(app)
@@ -104,7 +105,7 @@ def generate_random_pattern():
     
     return pattern
 
-def pattern_to_image(pattern, filename='pattern.png'):
+def pattern_to_image(pattern):
     scale = 80  # Slightly reduced from 100
     size = 7 * scale
     padding = scale
@@ -147,31 +148,30 @@ def pattern_to_image(pattern, filename='pattern.png'):
                 y = padding + (i * scale)
                 draw.text((x, y), char, fill=(0, 0, 0), font=font)
     
-    # Save high quality
-    image.save(filename, 'PNG', quality=100, dpi=(600, 600))
-    return image
+    # Convert to base64
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+    return img_str
 
 @app.route('/')
 def index():
-    # Generate random pattern and display image directly
-    pattern_type = random.choice(patterns_array)
-    pattern = generate_pattern(pattern_type)
-    image_bytes = io.BytesIO()
-    pattern_image = pattern_to_image(pattern)
-    pattern_image.save(image_bytes, format='PNG')
-    image_bytes.seek(0)
-    return send_file(image_bytes, mimetype='image/png')
+    try:
+        pattern_type = random.choice(patterns_array)
+        pattern = generate_pattern(pattern_type)
+        img_str = pattern_to_image(pattern)
+        return jsonify({'image': img_str})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/<pattern_type>')
 def get_pattern(pattern_type):
     try:
         pattern = generate_pattern(pattern_type)
-        image_bytes = io.BytesIO()
-        pattern_image = pattern_to_image(pattern)
-        image_bytes.seek(0)
-        return send_file(image_bytes, mimetype='image/png')
+        img_str = pattern_to_image(pattern)
+        return jsonify({'image': img_str})
     except Exception as e:
-        return str(e), 400
+        return jsonify({'error': str(e)}), 400
 
 if __name__ == '__main__':
     app.run(debug=True, port=3000)
